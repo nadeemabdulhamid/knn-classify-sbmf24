@@ -5,9 +5,7 @@ Require Import list_ot.
 Require Import bounding_boxes. (* for datapt *)
 Require Import classify.
 
-(*Module Import ListMap := FMapList.Make(ListOrderedType).*)
-
-Import ListMap.
+Import FMap.
 Import ListNotations.
 
 (* shuffled ... *)

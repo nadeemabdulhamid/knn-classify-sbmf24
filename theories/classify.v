@@ -19,9 +19,9 @@ Require Import max_pqueue.
 
 (* ======= Data Structure Instantiations ======= *)
 
-Module Import ListMap := FMapAVL.Make(ListOrderedType).
-Import ListMap.Raw.Proofs.
-Definition LabelTable := (ListMap.t nat). (* a dictionary mapping `datapt`s (`list nat`) to `nat` (classification labels)*)
+Module Import FMap := FMapAVL.Make(ListOrderedType).
+Import FMap.Raw.Proofs.
+Definition LabelTable := (FMap.t nat). (* a dictionary mapping `datapt`s (`list nat`) to `nat` (classification labels)*)
 
 Module MaxPQ := List_MaxPQ NatTTLB.
 Module KNNS_LPQ := KNNS MaxPQ. (* instantiate the KNN search module with a PQ implementation *)
@@ -408,7 +408,7 @@ Theorem classify_correct :
     0 < K -> 0 < k ->
     length data >= K ->
     (forall v' : datapt, List.In v' data -> length v' = k) ->  (* all data of dimension k *)
-    (forall d : datapt, List.In d data -> In d labels) -> (* every datapt has a label *)
+    (forall d : datapt, List.In d data -> FMap.In d labels) -> (* every datapt has a label *)
     classify dist_metric K k data labels query = Some c ->
     exists near far classes,
         Permutation data (near ++ far) /\
