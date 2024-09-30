@@ -1,0 +1,11 @@
+*.aux
+*.vos
+*.vok
+*.vok
+*.vo
+*.glob
+*.cache
+*.pdf
+.DS_Store
+CoqMakefile*
+.CoqMakefile.d

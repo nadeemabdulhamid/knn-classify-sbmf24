@@ -408,7 +408,7 @@ Proof.
     inversion_clear Hi2; auto.
 Qed.
 
-#[export] Hint Resolve all_in_leb_app_lst all_in_leb_lst_app : core.
+#[export] Hint Resolve all_in_leb_app_lst all_in_leb_lst_app: core.
 
 
 Lemma perm_app_in_or :
@@ -475,6 +475,7 @@ Proof.
         {
             exists []; exists [e]; exists lst; exists [].
             exists ql; exists [e]; repeat split; auto.
+            rewrite app_nil_r; auto.
             pose proof Hdm as Hdm';
             apply delete_max_Some_relate with (pl := e::lst) (ql := ql) in Hdm' as (Hdms, Hcomp); auto using insert_priq, insert_relate;
             fold compare in Hcomp.
@@ -1111,7 +1112,7 @@ Proof.
         replace data with (@nil datapt) in *. 2: { inversion Htree; auto. }
         assert (Permutation lst result) as Hperm; auto.
         apply abs_perm with (sum_dist query) pq; auto.
-        exists lst; exists []; exists []; exists []; exists []; simpl; repeat split; auto.
+        exists lst; exists []; exists []; exists []; exists []; simpl; repeat split; auto;
         rewrite app_nil_r; auto.
     }   
 
