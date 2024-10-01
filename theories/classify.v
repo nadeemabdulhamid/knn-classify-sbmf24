@@ -119,6 +119,7 @@ Inductive ClassesOf (LT : LabelTable) : list datapt -> list nat -> Prop :=
 
 
 Definition ClassesOf_alt (LT : LabelTable) (ks : list datapt) (vs : list nat) : Prop :=
+    length ks = length vs /\
     forall i k v, nth_error ks i = Some k -> nth_error vs i = Some v -> MapsTo k v LT.
 
 
@@ -235,12 +236,14 @@ Proof.
     exists k'; split; auto.
 Qed.
 
-Lemma ClassesOf_equiv_alt :
+Lemma ClassesOf_equiv_alt_1 :
     forall LT ks vs, 
         ClassesOf LT ks vs ->
         ClassesOf_alt LT ks vs.
 Proof.
-    intros LT ks vs Hc i.
+    intros LT ks vs Hc; split.
+    apply ClassesOf_length with LT; auto.
+    intros i.
     generalize LT ks vs Hc; clear LT ks vs Hc.
     induction i.
     - intros LT ks vs Hc k v H1 H2.
@@ -254,6 +257,37 @@ Proof.
       inversion Hc; auto.
       apply IHi with ks vs; auto.
 Qed.
+
+Lemma ClassesOf_equiv_alt_2 :
+    forall LT ks vs, 
+        ClassesOf_alt LT ks vs ->
+        ClassesOf LT ks vs.
+Proof.
+    induction ks as [ | k ks IHks ]; unfold ClassesOf_alt; 
+        destruct vs as [ | v vs ]; simpl.
+    - constructor.
+    - intros (H1, H2); try discriminate.
+    - intros (H1, H2); try discriminate.
+    - intros (H1, H2).
+      constructor.
+      apply (H2 0 k v); auto.
+      apply IHks.
+      split; auto.
+      intros i k' v' Hk' Hv'.
+      apply (H2 (S i) k' v'); auto.
+Qed.
+
+Lemma ClassesOf_equiv_alt :
+    forall LT ks vs, 
+        ClassesOf LT ks vs <->
+        ClassesOf_alt LT ks vs.
+Proof.
+    split.
+    apply ClassesOf_equiv_alt_1.
+    apply ClassesOf_equiv_alt_2.
+Qed.
+
+
 
 (*****************************************************************)
 
@@ -369,7 +403,90 @@ Proof.
 Qed.
 
 
+Lemma plurality_none :
+    forall ns cnt, plurality ns = (None, cnt) -> 
+        ns = nil \/ exists m1 m2, m1 <> m2 /\ count ns m1 = cnt /\ count ns m2 = cnt /\ 
+                                    (forall m', m' <> m1 -> m' <> m2 -> count ns m' <= cnt).
+Proof.
+    induction ns as [ | n ns Hns ]; auto.
+    intros cnt Hplur.
+    right.
+    simpl in Hplur.
+    destruct (plurality ns) as (rv, rc) eqn:Heqpl.
+    destruct rv as [ v | ].
+    -
+        clear Hns. 
+        exists v; exists n.
+        destruct (rc =? S (count ns n)) eqn:Hrc.
+        --
+            apply EqNat.beq_nat_true_stt in Hrc.
+            injection Hplur as Hplur'.
+            rewrite Hplur' in *; clear Hplur' rc.
+            apply plurality_some_count in Heqpl as H1.
+            compare n v; intros Hnv.
+            replace n with v in *; lia.
+            apply plurality_all_lt with (m' := n) in Heqpl as H2.
+            destruct H2; [ absurd (n=v); auto | ].
+            repeat split; auto; simpl.
+            replace (n =? v) with false; auto; symmetry.
+            apply Nat.eqb_neq; auto.
+            replace (n =? n) with true; auto; symmetry.
+            apply Nat.eqb_eq; auto.
+            intros m' Hm'v Hm'n.
+            replace (n =? m') with false.
+            rewrite <- H1.
+            apply plurality_all_lt with (m' := m') in Heqpl as H2.
+            destruct H2; auto; try lia.
+            symmetry; apply Nat.eqb_neq; auto. 
+        --
+        destruct (rc <? S (count ns n)); try discriminate.
+    - 
+        destruct (rc <? S (count ns n)) eqn:Hlt; try discriminate.
+        injection Hplur as Hplur; replace rc with cnt in *; clear Hplur rc.
+        apply Nat.ltb_ge in Hlt.
+        destruct (Hns cnt (eq_refl _)); clear Hns;
+            [ rewrite H in *; clear H ns; simpl in *;
+                injection Heqpl as Heqpl; lia | ].
+        assert (count ns n < cnt) as Hlt'; try lia.
+        destruct H as (m1, (m2, (H1, (H2, (H3, H4))))).
+        exists m1, m2; repeat split; auto; try lia; simpl.
+        destruct (n =? m1) eqn:Hnm1; try lia; rewrite Nat.eqb_eq in Hnm1; replace m1 with n in *; auto; lia.
+        destruct (n =? m2) eqn:Hnm2; try lia; rewrite Nat.eqb_eq in Hnm2; replace m2 with n in *; auto; lia.
+        intros m' Hm'm1 Hm'm2.
+        destruct (n =? m') eqn:Hnm'.
+        rewrite Nat.eqb_eq in Hnm'; rewrite Hnm' in *; lia. 
+        rewrite Nat.eqb_neq in Hnm'; apply H4; auto.
+Qed.
 
+
+Theorem isplurality_is_plurality :
+    forall ns m, IsPlurality m ns -> fst(plurality ns) = Some m.
+Proof.
+    intros ns m (H1, H2).
+    destruct (plurality ns) as (res, cnt) eqn:Hplur.
+    destruct res as [ val | ]; simpl.
+    - 
+        destruct (plurality_correct _ _ _ Hplur) as (Hp1, (Hp2, Hp3)).
+        destruct (H2 val); auto.
+        destruct (Hp3 m); auto.
+        lia.
+    -
+        destruct (plurality_none _ _ Hplur).
+        rewrite H in H1; inversion H1.
+        destruct H as (m1, (m2, (Hc1, (Hc2, (Hc3, Hc4))))).
+        destruct (H2 m1) as [ H | H ].
+        -- 
+            rewrite H in *; clear H m1.
+            destruct (H2 m2) as [ H | H ].
+            rewrite H in *; tauto.
+            lia.
+        -- 
+            destruct (H2 m2) as [H' | H']  .
+            rewrite H' in *; lia.
+            assert (count ns m <= cnt); try lia.
+            apply Hc4; auto;
+                intro H0; rewrite H0 in *; lia.
+Qed.
 
 Theorem classify_correct0 : 
     forall dist_metric,
@@ -401,7 +518,7 @@ Qed.
 
 
 
-Theorem classify_correct : 
+Theorem classify_correct_some : 
     forall dist_metric,
       dist_metric_wf dist_metric ->
     forall K k data labels query c,
@@ -417,7 +534,7 @@ Theorem classify_correct :
         ClassesOf labels near classes /\
         IsPlurality c classes. (* c is the plurality of all the `near` labels c*)
 Proof.
-    unfold classify; intros dist_metric Hdmwf K k data labels query c HK Hk Hdata Hdim Hclassify.
+    unfold classify; intros dist_metric Hdmwf K k data labels query c HK Hk Hdata Hdim Hlab Hclassify.
     assert (exists far : list datapt,
         length (knn_search dist_metric K k (build_kdtree k data) query) = min K (length data) /\
         Permutation data ((knn_search dist_metric K k (build_kdtree k data) query) ++ far) /\
@@ -429,7 +546,7 @@ Proof.
     repeat split; auto; try lia; try apply plurality_is_plurality; auto.
     apply lookup_labels_correct; auto.
         intros k' Hinknn.
-        apply Hclassify.
+        apply Hlab.
         apply Permutation_in with (knn_search dist_metric K k (build_kdtree k data) query ++ far); auto.
         apply in_or_app; auto.
 Qed.
@@ -442,3 +559,57 @@ Extraction Language Scheme.
 
 Recursive Extraction classify.
 *)
+
+
+
+(* ============= *)
+
+Theorem classify_correct_none :
+    forall dist_metric,
+      dist_metric_wf dist_metric ->
+    forall K k data labels query,
+    0 < K -> 0 < k ->
+    length data >= K ->
+    (forall v' : datapt, List.In v' data -> length v' = k) ->  (* all data of dimension k *)
+    (forall d : datapt, List.In d data -> FMap.In d labels) -> (* every datapt has a label *)
+    classify dist_metric K k data labels query = None ->
+    ~exists c,
+        IsPlurality c (lookup_labels labels (knn_search dist_metric K k (build_kdtree k data) query)).
+Proof.
+    unfold classify; intros dist_metric Hdmwf K k data labels query HK Hk Hdata Hdim Hlab Hclassify.
+    intros (c, Hplur).
+    apply isplurality_is_plurality in Hplur.
+    rewrite Hplur in Hclassify; discriminate.
+Qed.
+
+
+
+Theorem classify_correct : 
+    forall dist_metric, dist_metric_wf dist_metric ->
+    forall K k data labels query,
+    0 < K -> 0 < k ->
+    length data >= K ->
+    (forall v' : datapt, List.In v' data -> length v' = k) ->
+    (forall d : datapt, List.In d data -> FMap.In d labels) ->
+    (exists c near far classes, classify dist_metric K k data labels query = Some c /\
+        Permutation data (near ++ far) /\
+        length near = K /\                       
+        all_in_leb (dist_metric query) near far /\
+        ClassesOf labels near classes /\
+        IsPlurality c classes)
+    \/
+    (classify dist_metric K k data labels query = None /\
+     ~exists c, IsPlurality c (lookup_labels labels 
+                    (knn_search dist_metric K k 
+                        (build_kdtree k data) query))).
+Proof.
+    intros dist_metric Hdmwf K k data labels query HK Hk Hdata Hdim Hlab.
+    destruct (classify dist_metric K k data labels query) eqn:Heqn; [ left | right ].
+    destruct (classify_correct_some dist_metric Hdmwf K k data labels query n HK Hk Hdata Hdim Hlab Heqn)
+        as (near, (far, (classes, Hex))).
+    exists n, near, far, classes; split; auto.
+    split; auto.
+    apply classify_correct_none; auto.
+Qed.
+
+
